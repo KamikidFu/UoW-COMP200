@@ -5,7 +5,7 @@
 #define pushButtons (int*)0x73001
 
 //Main program
-void main(){
+void parallel_main(){
 	//Status, to change the print base or quit, 1 is 16-base, 2 is 10-base, 3 is to quit
 	int status = 1;
 	//Keep looping

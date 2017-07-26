@@ -1,13 +1,21 @@
 .bss
 	old_vector: .word
 	current_task: .word
-	serial_PCB: 
+	breakout_PCB: 
 			.space 18
 			.space 200
-	serial_stack:
+	breakout_stack:
+	rocks_PCB: 
+			.space 18
+			.space 200
+	rocks_stack:
+	gameSelect_PCB: 
+			.space 18
+			.space 200
+	gameSelect_stack:
 
 .data
-	time_slice: .word 2
+	time_slice: .word 100
 
 .equ pcb_link, 0
 .equ pcb_reg1, 1
@@ -50,17 +58,40 @@ main:
 	addi $1, $0, 0x03	#Set up auto-start and timer-enable value
 	sw $1, 0x72000($0)	#Store the control value into timer
 
-	#Set up Multitasking
-	la $1, serial_PCB	#Load the base address for serial PCB
-	la $2, serial_PCB	#Load PCB
+	#Set up Multitasking, PCB 1, serial task
+	la $1, breakout_PCB	#Load the base address for serial PCB, task 1
+	la $2, rocks_PCB	#Load task 2 PCB
 	sw $2, pcb_link($1)	#Store address to pcb_link
-	la $2, serial_stack	#Load stack
+	la $2, breakout_stack	#Load stack
 	sw $2, pcb_sp($1)	#Store to pcb_sp
-	la $2, serial_main	#Load serial main program address
+	la $2, breakout_main	#Load serial main program address
 	sw $2, pcb_ear($1)	#Store to pcb_ear
 	movsg $2, $cctrl	#Load cctrl settings
 	sw $2, pcb_cctrl($1)	#Store to pcb_cctrl
 	sw $1, current_task($0)	#Store the address to current task pointer
+
+	#Set up Multitasking, PCB 2, parallel task
+	la $1, rocks_PCB	#Load the base address for parallel PCB, task 2
+	la $2, gameSelect_PCB	#Load task 1 PCB
+	sw $2, pcb_link($1)	#Store address to pcb_link
+	la $2, rocks_stack	#Load stack
+	sw $2, pcb_sp($1)	#Store to pcb_sp
+	la $2, rocks_main	#Load serial main program address
+	sw $2, pcb_ear($1)	#Store to pcb_ear
+	movsg $2, $cctrl	#Load cctrl settings
+	sw $2, pcb_cctrl($1)	#Store to pcb_cctrl
+
+	#Set up Multitasking, PCB 3, parallel task
+	la $1, gameSelect_PCB	#Load the base address for parallel PCB, task 2
+	la $2, breakout_PCB	#Load task 1 PCB
+	sw $2, pcb_link($1)	#Store address to pcb_link
+	la $2, gameSelect_stack	#Load stack
+	sw $2, pcb_sp($1)	#Store to pcb_sp
+	la $2, gameSelect_main	#Load serial main program address
+	sw $2, pcb_ear($1)	#Store to pcb_ear
+	movsg $2, $cctrl	#Load cctrl settings
+	sw $2, pcb_cctrl($1)	#Store to pcb_cctrl
+
 	j Load_Context		#Jump to load context of registers from PCB
 	
 Interrupt_Handler:
@@ -68,16 +99,13 @@ Interrupt_Handler:
 	#It will go here to handle the interrupt
 
 	movsg $13,$estat	#Get the value of $estat into $13
-	andi $4,$13,0xFFB0	#Check if there are other interrupts besides IRQ2, 0b10110000=0xB0,last 4 bits are undefinied in $estat
+	andi $4,$13,0xFFB0	#Check if there are other interrupts besides IRQ2, 					#0b10110000=0xB0,last 4 bits are undefinied in $estat
 	beqz $4,IRQ_2_Handler	#If there is only IRQ2, then brench to the handler
 	lw $13,old_vector($0)	#Else load the value in old_vector, the orignal handler
 	jr $13			#Jump to that handler
 
 IRQ_2_Handler:
 	sw $0, 0x72003($0)	#Acknowledge timer
-	lw $13, counter($0)	#Retrive counter value into $13
-	addi $13,$13,1		#Add one more into $13
-	sw $13, counter($0)	#Restore $13 into counter
 	lw $13, time_slice($0)
 	subi $13, $13, 1
 	sw $13, time_slice($0)
@@ -118,7 +146,7 @@ Schedule:
 	sw $13, current_task($0)
 
 Renew_time_slice:
-	addi $13, $0, 2
+	addi $13, $0, 100
 	sw $13, time_slice($0)
 
 Load_Context:

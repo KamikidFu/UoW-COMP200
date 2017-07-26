@@ -125,6 +125,8 @@ void serial_main(){
 	while(1){
 		//Receive the letter from sp2
 		char statusReceiveLetter = read_char();
+		//Clean the line for next print
+		clean_line();
 		//Check the letter to change the status
 		if(statusReceiveLetter == '1'){
 			status=1;
@@ -144,8 +146,6 @@ void serial_main(){
 			print_timer_interrupts();
 		}else if(status == 0)
 	      		return;		
-		//Clean the line for next print
-		clean_line();
 	}
 }
 
