@@ -1,6 +1,7 @@
 .bss
 	old_vector: .word	#old_vector is a place to store system handler address
 	current_task: .word	#current_task is to store the current running task PCB address
+	#run_flag: .word
 	serial_PCB:  		#serial_PCB is a space to store task's registers
 			.space 20
 			.space 200
@@ -106,7 +107,7 @@ main:
 	sw $2, pcb_ear($1)	#Store to pcb_ear
 	movsg $2, $cctrl	#Load cctrl settings
 	sw $2, pcb_cctrl($1)	#Store to pcb_cctrl
-	addi $2, $0, 4
+	addi $2, $0, 1
 	sw $2, pcb_timeSlice($1)
 	addi $2, $0, 1
 	sw $2, pcb_enable($1)
@@ -117,7 +118,7 @@ main:
 	sw $2, pcb_link($1)	#Store address to pcb_link
 	la $2, idle_stack	#Load stack
 	sw $2, pcb_sp($1)	#Store to pcb_sp
-	la $2, idle_entry	#Load serial main program address
+	la $2, idle_main	#Load serial main program address
 	sw $2, pcb_ear($1)	#Store to pcb_ear
 	movsg $2, $cctrl	#Load cctrl settings
 	sw $2, pcb_cctrl($1)	#Store to pcb_cctrl
@@ -156,8 +157,9 @@ Quit_Task:
 	lw $13, current_task($0)
 	sw $0, pcb_enable($13)
 	#lw $13, quit_counter($0)
-	#seqi $13, $13, 3
+	seqi $13, $13, 3
 	#bnez $13, idle_entry
+	#sw $0, run_flag($0)
 	lw $13, quit_counter($0)
 	addi $13, $13, 1
 	sw $13, quit_counter($0)
@@ -188,6 +190,7 @@ IRQ_2_Handler:
 				#branch to dispatcher to dispatch next task
 	rfe			#Else, return from exception
 
+
 dispatcher:			#dispatcher is to dispatch each
 Save_Context:
 	#Save_Context is to save current task's registers into PCB
@@ -208,6 +211,9 @@ Save_Context:
 	sw $sp, pcb_sp($13)
 	sw $ra, pcb_ra($13)
 
+	#lw $1, run_flag($0)
+	#sw $1, pcb_enable($13)
+
 	movsg $1, $ers		#Move $13 value from $ers to $1
 	sw $1, pcb_reg13($13)	#Store $1 into pcb_reg13, where $13 should be
 	
@@ -223,7 +229,8 @@ Schedule:
 	lw $13, pcb_link($13)	#Using $13 value loaded before, to load next task PCB address in pcb_link
 	sw $13, current_task($0)#Store next task PCB address into current_task flag
 	lw $13, quit_counter($0)
-	seqi $13, $13, 3
+	#seqi $13, $13, 3
+	sgei $13, $13, 3
 	bnez $13, idle_entry
 	#lw $13, current_task($0)
 	#lw $13, pcb_enable($13)
