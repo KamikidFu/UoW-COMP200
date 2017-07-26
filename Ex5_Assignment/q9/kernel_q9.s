@@ -12,8 +12,14 @@
 	rocks_stack:		#rocks_stack is a space to store task's stack
 	gameSelect_PCB:     	#gameSelect_PCB is a space to store task's registers
 			.space 18
+
+
 			.space 200
 	gameSelect_stack:	#gameSelect_stack is a space to store task's stack
+	idle_PCB:
+			.space 18
+			.space 200
+	idle_stack:
 
 .data
 	time_slice: .word 100	#time_slice is a value of each task runtime duration
@@ -39,6 +45,10 @@
 .equ pcb_cctrl, 17		#pcb_cctrl is to store $cctrl, the CPU control register
 .equ pcb_timeSlice, 18		#pcb_timeSlice is to store more specific time slice for different task
 .equ pcb_enable, 19		#pcb_enable is an enabled flag, skip unenabed task
+.equ pcb_quitGameSelect, 20
+.equ left_ssd, 0x73002
+.equ right_ssd, 0x73003
+.equ parallel_ssd_control, 0x73004
 
 .text
 .global main
@@ -76,6 +86,7 @@ main:
 	sw $2, pcb_timeSlice($1)#Store time slice into pcb
 	addi $2, $0, 0
 	sw $2, pcb_enable($1)	#Set enable current task in PCB
+	sw $0, pcb_quitGameSelect($1)
 
 	#Set up Multitasking, PCB 2, rocks task
 	la $1, rocks_PCB	#Load the base address for rocks PCB, task 2
@@ -91,6 +102,7 @@ main:
 	sw $2, pcb_timeSlice($1)#Store time slice into pcb
 	addi $2, $0, 0
 	sw $2, pcb_enable($1)	#Set enable current task in PCB
+	sw $0, pcb_quitGameSelect($1)
 	
 
 	#Set up Multitasking, PCB 3, gameSelect task
@@ -107,6 +119,23 @@ main:
 	sw $2, pcb_timeSlice($1)#Store time slice into pcb
 	addi $3, $0, 1
 	sw $3, pcb_enable($1)	#Set enable current task in PCB
+	sw $3, pcb_quitGameSelect($1)
+
+	#Set up idle PCB
+	la $1, idle_PCB
+	la $2, idle_PCB
+	sw $2, pcb_link($1)
+	la $2, idle_stack
+	sw $2, pcb_sp($1)
+	la $2, idle_main
+	sw $2, pcb_ear($1)
+	movsg $2, $cctrl
+	sw $2, pcb_cctrl($1)
+	addi $2, $0, 1
+	sw $2, pcb_timeSlice($1)
+	addi $3, $0, 1
+	sw $3, pcb_enable($1)
+	sw $0, pcb_quitGameSelect($1)
 	
 	#Set the first run task, serial task
 	la $1, gameSelect_PCB	#Load the address of serial_PCB
@@ -123,10 +152,23 @@ task3_entry:
 	jal gameSelect_main
 	j Quit_Task
 
+idle_entry:
+	sw $0, parallel_ssd_control($0)
+	la $1, idle_PCB
+	sw $1, current_task($0)
+	j Load_Context
+idle_main:
+	addi $13, $0, 0x40
+	sw $13, left_ssd($0)
+	sw $13, right_ssd($0)
+	j idle_main
+
 Quit_Task:
 	lw $13, current_task($0)
 	sw $0, pcb_enable($13)
-
+	lw $13, pcb_quitGameSelect($13)
+	seqi $13, $13, 1
+	bnez $13, idle_entry
 
 Interrupt_Handler:
 	#When interrupts generated, by the set of $evec
@@ -182,7 +224,7 @@ Schedule:
 	sw $13, current_task($0)#Store next task PCB address into current_task flag
 	lw $13, pcb_enable($13)
 	seqi $13, $13, 0
-	bnez $13, Schedule
+	bnez $13, idle_entry
 
 Renew_time_slice:
 	#Renew time slice for scheduled next task to run

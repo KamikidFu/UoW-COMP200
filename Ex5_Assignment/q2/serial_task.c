@@ -20,8 +20,8 @@ char read_char(){
 		if((*sp2_status & 1)!=0){			//Check the value in status register, if it is ready for it to receive any char
 			return *sp2_receive;			//Then receive it from receive register
 		}
-		return '\0';					//Otherwise, return empty char
 	}
+	return '\0';					//Otherwise, return empty char
 }
 
 void print_char(char charToPass){

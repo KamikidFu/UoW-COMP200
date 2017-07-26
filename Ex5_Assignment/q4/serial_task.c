@@ -20,8 +20,8 @@ char read_char(){
 		if((*sp2_status & 1)!=0){			//Check the value in status register, if it is ready for it to receive any char
 			return *sp2_receive;			//Then receive it from receive register
 		}
-		return '\0';					//Otherwise, return empty char
 	}
+	return '\0';					//Otherwise, return empty char
 }
 
 void print_char(char charToPass){
@@ -125,8 +125,6 @@ void serial_main(){
 	while(1){
 		//Receive the letter from sp2
 		char statusReceiveLetter = read_char();
-		//Clean the line for next print
-		clean_line();
 		//Check the letter to change the status
 		if(statusReceiveLetter == '1'){
 			status=1;
@@ -146,6 +144,8 @@ void serial_main(){
 			print_timer_interrupts();
 		}else if(status == 0)
 	      		return;		
+		//Clean the line for next print
+		clean_line();
 	}
 }
 

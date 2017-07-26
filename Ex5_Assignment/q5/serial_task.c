@@ -22,6 +22,7 @@ char read_char(){
 		}
 		return '\0';					//Otherwise, return empty char
 	}
+	return '\0';					//Otherwise, return empty char
 }
 
 void print_char(char charToPass){
