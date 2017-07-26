@@ -1,0 +1,29 @@
+1. Declare sub-methods before the main method, otherwise, it will show error like "does not match ... before".
+	For example:
+	void main(){
+		add();
+	}
+	void add(){
+		//...
+	}
+	When you run wcc -S test.c, it gives a warning like below:	
+	test.c:4: warning: declaration of `add' does not match previous declaration at test.c:2
+	Solution could be:
+	void add(){
+		//...
+	}
+	void main(){
+		add();
+	}
+
+2. Declare all the variables that you like to use at the beginning of methods, otherwise, the complier may skip your declaration and shows warnings or errors.
+	For example:
+	void main(){
+		int variable_1=0;
+		int variable_2=0;
+		//...
+	}
+
+3. (From My Friend testing) No Bad Character, i.e., when use a word to declare a variable, choose the most specific word not any things else, especially something bad words. Somehow the WASM may detect the words by using remote command to connect the physical board.
+
+4. When you feel lost, or get stuck. Ask tutors or demos if you are in lab, or go to moodle and check PPTs. Follow the advices or patterns you received or seen in PPTs.

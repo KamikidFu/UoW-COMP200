@@ -144,8 +144,9 @@ void main(){
 			print_seconds();
 		}else if(status == 3){
 			print_timer_interrupts();
-		}else if(status == 0)
-	      		return;		
+		}else{
+			return;
+		}		
 	}
 }
 

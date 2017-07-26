@@ -1,16 +1,17 @@
 .bss
-	old_vector: .word
-	current_task: .word
-	serial_PCB: 
+	old_vector: .word	#old_vector is a place to store system handler address
+	current_task: .word	#current_task is to store the current running task PCB address
+	serial_PCB: 		#serial_PCB is a space to store task's registers
 			.space 18
 			.space 200
-	serial_stack:
+	serial_stack:		#serial_stack is a space to store task's stack
 
 .data
-	time_slice: .word 2
+	time_slice: .word 2	#time_slice is a value of each task runtime duration
 
-.equ pcb_link, 0
-.equ pcb_reg1, 1
+#These are definitions of both general and special registers in PCB
+.equ pcb_link, 0		#pcb_link is a space to store next task's PCB address
+.equ pcb_reg1, 1		#pcb_reg1 to pcb_ra are all general registers
 .equ pcb_reg2, 2
 .equ pcb_reg3, 3
 .equ pcb_reg4, 4
@@ -25,8 +26,8 @@
 .equ pcb_reg13, 13
 .equ pcb_sp, 14
 .equ pcb_ra, 15
-.equ pcb_ear, 16
-.equ pcb_cctrl, 17
+.equ pcb_ear, 16		#pcb_ear is to store $ear, the exception address register
+.equ pcb_cctrl, 17		#pcb_cctrl is to store $cctrl, the CPU control register
 
 .text
 .global main
@@ -50,7 +51,7 @@ main:
 	addi $1, $0, 0x03	#Set up auto-start and timer-enable value
 	sw $1, 0x72000($0)	#Store the control value into timer
 
-	#Set up Multitasking
+	#Set up Multitasking, single task of serial
 	la $1, serial_PCB	#Load the base address for serial PCB
 	la $2, serial_PCB	#Load PCB
 	sw $2, pcb_link($1)	#Store address to pcb_link
@@ -64,33 +65,35 @@ main:
 	j Load_Context		#Jump to load context of registers from PCB
 	
 Interrupt_Handler:
-	#When interrupts generated, by the set of $evec
-	#It will go here to handle the interrupt
-
+	#When interrupts generated, by the set of $evec,
+	#it will go here to handle the interrupt
 	movsg $13,$estat	#Get the value of $estat into $13
-	andi $4,$13,0xFFB0	#Check if there are other interrupts besides IRQ2, 0b10110000=0xB0,last 4 bits are undefinied in $estat
+	andi $4,$13,0xFFB0	#Check if there are other interrupts besides IRQ2
 	beqz $4,IRQ_2_Handler	#If there is only IRQ2, then brench to the handler
 	lw $13,old_vector($0)	#Else load the value in old_vector, the orignal handler
 	jr $13			#Jump to that handler
 
 IRQ_2_Handler:
+	#Timer handler
 	sw $0, 0x72003($0)	#Acknowledge timer
-	lw $13, counter($0)	#Retrive counter value into $13
+	lw $13, counter($0)	#Load counter value into $13
 	addi $13,$13,1		#Add one more into $13
 	sw $13, counter($0)	#Restore $13 into counter
-	lw $13, time_slice($0)
-	subi $13, $13, 1
-	sw $13, time_slice($0)
-	beqz $13, dispatcher
-	rfe
+	lw $13, time_slice($0)	#Load time slice value into $13
+	subi $13, $13, 1	#Substract by one
+	sw $13, time_slice($0)	#Restore $13 into time_slice
+	beqz $13, dispatcher	#If $13 is 0, it means the current task running time is over
+				#branch to dispatcher to dispatch next task
+	rfe			#Else, return from exception
 
-dispatcher:
+dispatcher:			#dispatcher is to dispatch each tasks
 Save_Context:
-	lw $13, current_task($0)
+	#Save_Context is to save current task's registers into PCB
+	lw $13, current_task($0)#Load current task PCB address
 
-	sw $1, pcb_reg1($13)
-	sw $2, pcb_reg2($13)
-	sw $3, pcb_reg3($13)
+	sw $1, pcb_reg1($13)	#Store general registers, $1 to $ra, except $13
+	sw $2, pcb_reg2($13)	#because the original value in $13 is automatically
+	sw $3, pcb_reg3($13)	#stored into $ers, exception register save
 	sw $4, pcb_reg4($13)
 	sw $5, pcb_reg5($13)
 	sw $6, pcb_reg6($13)
@@ -103,37 +106,40 @@ Save_Context:
 	sw $sp, pcb_sp($13)
 	sw $ra, pcb_ra($13)
 
-	movsg $1, $ers
-	sw $1, pcb_reg13($13)
+	movsg $1, $ers		#Move $13 value from $ers to $1
+	sw $1, pcb_reg13($13)	#Store $1 into pcb_reg13, where $13 should be
 	
-	movsg $1, $ear
-	sw $1, pcb_ear($13)
+	movsg $1, $ear		#Move $ear from $ear to $1
+	sw $1, pcb_ear($13)	#Store $1 into pcb_ear
 
-	movsg $1, $cctrl
-	sw $1, pcb_cctrl($13)
+	movsg $1, $cctrl	#Move $cctrl from $cctrl to $1
+	sw $1, pcb_cctrl($13)	#Store $1 into pcb_cctrl
 
 Schedule:
-	lw $13, current_task($0)
-	lw $13, pcb_link($13)
-	sw $13, current_task($0)
+	#Schedule next task become current task
+	lw $13, current_task($0)#Load current task PCB address
+	lw $13, pcb_link($13)	#Using $13 value loaded before, to load next task PCB address in pcb_link
+	sw $13, current_task($0)#Store next task PCB address into current_task flag
 
 Renew_time_slice:
-	addi $13, $0, 2
-	sw $13, time_slice($0)
+	#Renew time slice for scheduled next task to run
+	addi $13, $0, 2		#Add 2 to $13, the runtime duration
+	sw $13, time_slice($0)	#Store $13 into time_slice
 
 Load_Context:
-	lw $13, current_task($0)
+	#Load scheduled next task's registers in its PCB
+	lw $13, current_task($0)#Load current task PCB address
 
-	lw $1, pcb_reg13($13)
-	movgs $ers, $1
+	lw $1, pcb_reg13($13)	#Load $13 from pcb_reg13 to $1
+	movgs $ers, $1		#Move $13 value from $1 to $ers
 
-	lw $1, pcb_ear($13)
-	movgs $ear, $1
+	lw $1, pcb_ear($13)	#Load $ear from PCB
+	movgs $ear, $1		#Move the value to $ear
 
-	lw $1, pcb_cctrl($13)
-	movgs $cctrl, $1
+	lw $1, pcb_cctrl($13)	#Load $cctrl from PCB
+	movgs $cctrl, $1	#Move the value to $cctrl
 
-	lw $1, pcb_reg1($13)
+	lw $1, pcb_reg1($13)	#Load general registers from $1 to $ra except $13
 	lw $2, pcb_reg2($13)
 	lw $3, pcb_reg3($13)
 	lw $4, pcb_reg4($13)
