@@ -13,8 +13,9 @@
 			.space 20
 			.space 200
 	gameSelect_stack:
+	time_slice: .word
 .data
-	time_slice: .word 100	#time_slice is a value of each task runtime duration
+	#time_slice: .word 100	#time_slice is a value of each task runtime duration
 
 #These are definitions of both general and special registers in PCB
 .equ pcb_link, 0		#pcb_link is a space to store next task's PCB address
@@ -131,7 +132,7 @@ Interrupt_Handler:
 	#lw $13,old_vector($0)	#Else load the value in old_vector, the orignal handler
 	#jr $13			#Jump to that handler
 	movsg $13, $estat
-        andi $13, $13, 0x40 
+        andi $13, $13, 0x40
         bnez $13, IRQ_2_Handler
         lw $13, old_vector($0)
         jr $13
@@ -182,6 +183,10 @@ Schedule:
 	lw $13, current_task($0)#Load current task PCB address
 	lw $13, pcb_link($13)	#Using $13 value loaded before, to load next task PCB address in pcb_link
 	sw $13, current_task($0)#Store next task PCB address into current_task flag
+	lw $13, current_task($0)
+	lw $13, pcb_enable($13)
+	seqi $13, $13, 0
+	bnez $13, Schedule
 
 Renew_time_slice:
 	#Renew time slice for scheduled next task to run

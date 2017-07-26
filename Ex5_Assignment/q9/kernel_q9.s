@@ -1,28 +1,25 @@
 .bss
-	enable_flag: .word	#enable_flag is a place to store value which determine the task is enable or not
 	old_vector: .word	#old_vector is a place to store system handler address
 	current_task: .word	#current_task is to store the current running task PCB address
-	breakout_PCB:   	#breakout_PCB is a space to store task's registers
-			.space 18
+	serial_PCB:  		#serial_PCB is a space to store task's registers
+			.space 20
 			.space 200
-	breakout_stack:		#breakout_stack is a space to store task's stack
-	rocks_PCB:    		#rocks_PCB is a space to store task's registers
-			.space 18
+	serial_stack:		#serial_stack is a space to store task's stack
+	parallel_PCB:   	#parallel_PCB is a space to store task's registers
+			.space 20
 			.space 200
-	rocks_stack:		#rocks_stack is a space to store task's stack
-	gameSelect_PCB:     	#gameSelect_PCB is a space to store task's registers
-			.space 18
-
-
+	parallel_stack:		#parallel_stack is a space to store task's stack
+	gameSelect_PCB:
+			.space 20
 			.space 200
-	gameSelect_stack:	#gameSelect_stack is a space to store task's stack
+	gameSelect_stack:
 	idle_PCB:
 			.space 18
 			.space 200
 	idle_stack:
-
 .data
 	time_slice: .word 100	#time_slice is a value of each task runtime duration
+	quit_counter: .word 0	#
 
 #These are definitions of both general and special registers in PCB
 .equ pcb_link, 0		#pcb_link is a space to store next task's PCB address
@@ -43,9 +40,8 @@
 .equ pcb_ra, 15
 .equ pcb_ear, 16		#pcb_ear is to store $ear, the exception address register
 .equ pcb_cctrl, 17		#pcb_cctrl is to store $cctrl, the CPU control register
-.equ pcb_timeSlice, 18		#pcb_timeSlice is to store more specific time slice for different task
+.equ pcb_timeSlice, 18
 .equ pcb_enable, 19		#pcb_enable is an enabled flag, skip unenabed task
-.equ pcb_quitGameSelect, 20
 .equ left_ssd, 0x73002
 .equ right_ssd, 0x73003
 .equ parallel_ssd_control, 0x73004
@@ -72,81 +68,74 @@ main:
 	addi $1, $0, 0x03	#Set up auto-start and timer-enable value
 	sw $1, 0x72000($0)	#Store the control value into timer
 
-	#Set up Multitasking, PCB 1, breakout game
-	la $1, breakout_PCB	#Load the base address for breakout PCB, task 1
-	la $2, rocks_PCB	#Load task 2 PCB
+	#Set up Multitasking, PCB 1, serial task
+	la $1, serial_PCB	#Load the base address for serial PCB, task 1
+	la $2, parallel_PCB	#Load task 2 PCB
 	sw $2, pcb_link($1)	#Store address to pcb_link
-	la $2, breakout_stack	#Load stack
+	la $2, serial_stack	#Load stack
 	sw $2, pcb_sp($1)	#Store to pcb_sp
-	la $2, task1_entry	#Load breakout main program address
+	la $2, task1_entry	#Load serial main program address
 	sw $2, pcb_ear($1)	#Store to pcb_ear
 	movsg $2, $cctrl	#Load cctrl settings
 	sw $2, pcb_cctrl($1)	#Store to pcb_cctrl
-	addi $2, $0, 1		#Set up the time slice
-	sw $2, pcb_timeSlice($1)#Store time slice into pcb
-	addi $2, $0, 0
-	sw $2, pcb_enable($1)	#Set enable current task in PCB
-	sw $0, pcb_quitGameSelect($1)
+	addi $2, $0, 1
+	sw $2, pcb_timeSlice($1)
+	sw $2, pcb_enable($1)
 
-	#Set up Multitasking, PCB 2, rocks task
-	la $1, rocks_PCB	#Load the base address for rocks PCB, task 2
+	#Set up Multitasking, PCB 2, parallel task
+	la $1, parallel_PCB	#Load the base address for parallel PCB, task 2
 	la $2, gameSelect_PCB	#Load task 1 PCB
 	sw $2, pcb_link($1)	#Store address to pcb_link
-	la $2, rocks_stack	#Load stack
+	la $2, parallel_stack	#Load stack
 	sw $2, pcb_sp($1)	#Store to pcb_sp
-	la $2, task2_entry	#Load rocks main program address
+	la $2, task2_entry	#Load serial main program address
 	sw $2, pcb_ear($1)	#Store to pcb_ear
 	movsg $2, $cctrl	#Load cctrl settings
 	sw $2, pcb_cctrl($1)	#Store to pcb_cctrl
-	addi $2, $0, 1		#Set up the time slice
-	sw $2, pcb_timeSlice($1)#Store time slice into pcb
-	addi $2, $0, 0
-	sw $2, pcb_enable($1)	#Set enable current task in PCB
-	sw $0, pcb_quitGameSelect($1)
-	
+	addi $2, $0, 1
+	sw $2, pcb_timeSlice($1)
+	sw $2, pcb_enable($1)
 
-	#Set up Multitasking, PCB 3, gameSelect task
-	la $1, gameSelect_PCB	#Load the base address for gameSelect PCB, task 2
-	la $2, breakout_PCB	#Load task 1 PCB
+	#Set up gameSelect PCB
+	la $1, gameSelect_PCB
+	la $2, serial_PCB
 	sw $2, pcb_link($1)	#Store address to pcb_link
 	la $2, gameSelect_stack	#Load stack
 	sw $2, pcb_sp($1)	#Store to pcb_sp
-	la $2, task3_entry	#Load gameSelect main program address
+	la $2, task3_entry	#Load serial main program address
 	sw $2, pcb_ear($1)	#Store to pcb_ear
 	movsg $2, $cctrl	#Load cctrl settings
 	sw $2, pcb_cctrl($1)	#Store to pcb_cctrl
-	addi $2, $0, 4		#Set up the time slice
-	sw $2, pcb_timeSlice($1)#Store time slice into pcb
-	addi $3, $0, 1
-	sw $3, pcb_enable($1)	#Set enable current task in PCB
-	sw $3, pcb_quitGameSelect($1)
+	addi $2, $0, 4
+	sw $2, pcb_timeSlice($1)
+	addi $2, $0, 1
+	sw $2, pcb_enable($1)
 
 	#Set up idle PCB
 	la $1, idle_PCB
 	la $2, idle_PCB
-	sw $2, pcb_link($1)
-	la $2, idle_stack
-	sw $2, pcb_sp($1)
-	la $2, idle_main
-	sw $2, pcb_ear($1)
-	movsg $2, $cctrl
-	sw $2, pcb_cctrl($1)
+	sw $2, pcb_link($1)	#Store address to pcb_link
+	la $2, idle_stack	#Load stack
+	sw $2, pcb_sp($1)	#Store to pcb_sp
+	la $2, idle_entry	#Load serial main program address
+	sw $2, pcb_ear($1)	#Store to pcb_ear
+	movsg $2, $cctrl	#Load cctrl settings
+	sw $2, pcb_cctrl($1)	#Store to pcb_cctrl
 	addi $2, $0, 1
 	sw $2, pcb_timeSlice($1)
-	addi $3, $0, 1
-	sw $3, pcb_enable($1)
-	sw $0, pcb_quitGameSelect($1)
-	
+	addi $2, $0, 1
+	sw $2, pcb_enable($1)
+
 	#Set the first run task, serial task
-	la $1, gameSelect_PCB	#Load the address of serial_PCB
-	sw $1, current_task($0)	#Store the address to current task pointer
-	j Load_Context		#Jump to load context of registers from PCB
-	
+	la $1, serial_PCB	#Load the address of serial_PCB
+	sw $1, current_task($0)	#Store the address to current task flag
+	j Renew_time_slice	#Jump to load context of registers from PCB
+
 task1_entry:
-	jal breakout_main
+	jal serial_main
 	j Quit_Task
 task2_entry:
-	jal rocks_main
+	jal parallel_main
 	j Quit_Task
 task3_entry:
 	jal gameSelect_main
@@ -156,7 +145,7 @@ idle_entry:
 	sw $0, parallel_ssd_control($0)
 	la $1, idle_PCB
 	sw $1, current_task($0)
-	j Load_Context
+	j Renew_time_slice
 idle_main:
 	addi $13, $0, 0x40
 	sw $13, left_ssd($0)
@@ -166,21 +155,32 @@ idle_main:
 Quit_Task:
 	lw $13, current_task($0)
 	sw $0, pcb_enable($13)
-	lw $13, pcb_quitGameSelect($13)
-	seqi $13, $13, 1
-	bnez $13, idle_entry
+	#lw $13, quit_counter($0)
+	#seqi $13, $13, 3
+	#bnez $13, idle_entry
+	lw $13, quit_counter($0)
+	addi $13, $13, 1
+	sw $13, quit_counter($0)
 
 Interrupt_Handler:
-	#When interrupts generated, by the set of $evec
-	#It will go here to handle the interrupt
-	movsg $13,$estat	#Get the value of $estat into $13
-	andi $4,$13,0xFFB0	#Check if there are other interrupts besides IRQ2
-	beqz $4,IRQ_2_Handler	#If there is only IRQ2, then brench to the handler
-	lw $13,old_vector($0)	#Else load the value in old_vector, the orignal handler
-	jr $13			#Jump to that handler
+	#When interrupts generated, by the set of $evec,
+	#it will go here to handle the interrupt
+	#movsg $13,$estat	#Get the value of $estat into $13
+	#andi $4,$13,0xFFB0	#Check if there are other interrupts besides IRQ2, 					#0b10110000=0xB0,last 4 bits are undefinied in $estat
+	#beqz $4,IRQ_2_Handler	#If there is only IRQ2, then brench to the handler
+	#lw $13,old_vector($0)	#Else load the value in old_vector, the orignal handler
+	#jr $13			#Jump to that handler
+	movsg $13, $estat
+        andi $13, $13, 0x40
+        bnez $13, IRQ_2_Handler
+        lw $13, old_vector($0)
+        jr $13
 
 IRQ_2_Handler:
 	sw $0, 0x72003($0)	#Acknowledge timer
+	lw $13, counter($0)	#Retrive counter value into $13
+	addi $13,$13,1		#Add one more into $13
+	sw $13, counter($0)	#Restore $13 into counter
 	lw $13, time_slice($0)	#Load time slice value into $13
 	subi $13, $13, 1	#Substract by one
 	sw $13, time_slice($0)	#Restore $13 into time_slice
@@ -222,19 +222,27 @@ Schedule:
 	lw $13, current_task($0)#Load current task PCB address
 	lw $13, pcb_link($13)	#Using $13 value loaded before, to load next task PCB address in pcb_link
 	sw $13, current_task($0)#Store next task PCB address into current_task flag
-	lw $13, pcb_enable($13)
-	seqi $13, $13, 0
+	lw $13, quit_counter($0)
+	seqi $13, $13, 3
 	bnez $13, idle_entry
+	#lw $13, current_task($0)
+	#lw $13, pcb_enable($13)
+	#seqi $13, $13, 0
+	#bnez $13, Schedule
 
 Renew_time_slice:
 	#Renew time slice for scheduled next task to run
-	lw $1, current_task($0)	#Load current task's PCB address
-	lw $13, pcb_timeSlice($1)#Load the time slice for this task
-	sw $13, time_slice($1)	#Store into time_slice variable
+	lw $13, current_task($0)
+	lw $13, pcb_timeSlice($13)
+	sw $13, time_slice($0)
 
 Load_Context:
 	#Load scheduled next task's registers in its PCB
 	lw $13, current_task($0)#Load current task PCB address
+
+	lw $1, pcb_enable($13)
+	seqi $1, $1, 0
+	bnez $1, Schedule
 
 	lw $1, pcb_reg13($13)	#Load $13 from pcb_reg13 to $1
 	movgs $ers, $1		#Move $13 value from $1 to $ers
