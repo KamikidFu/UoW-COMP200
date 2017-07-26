@@ -62,7 +62,7 @@ main:
 	movsg $2, $cctrl	#Load cctrl settings
 	sw $2, pcb_cctrl($1)	#Store to pcb_cctrl
 	sw $1, current_task($0)	#Store the address to current task pointer
-	j Load_Context		#Jump to load context of registers from PCB
+	j Renew_time_slice	#Jump to load context of registers from PCB
 	
 Interrupt_Handler:
 	#When interrupts generated, by the set of $evec,

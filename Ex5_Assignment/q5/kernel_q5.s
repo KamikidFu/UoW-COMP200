@@ -80,7 +80,7 @@ main:
 	#Set the first run task, serial task
 	la $1, serial_PCB	#Load the address of serial_PCB
 	sw $1, current_task($0)	#Store the address to current task flag
-	j Load_Context		#Jump to load context of registers from PCB
+	j Renew_time_slice	#Jump to load context of registers from PCB
 	
 Interrupt_Handler:
 	#When interrupts generated, by the set of $evec,

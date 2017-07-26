@@ -1,19 +1,18 @@
 .bss
 	old_vector: .word	#old_vector is a place to store system handler address
 	current_task: .word	#current_task is to store the current running task PCB address
-	breakout_PCB:   	#breakout_PCB is a space to store task's registers
+	serial_PCB:  		#serial_PCB is a space to store task's registers
 			.space 18
 			.space 200
-	breakout_stack:		#breakout_stack is a space to store task's stack
-	rocks_PCB:    		#rocks_PCB is a space to store task's registers
+	serial_stack:		#serial_stack is a space to store task's stack
+	parallel_PCB:   	#parallel_PCB is a space to store task's registers
 			.space 18
 			.space 200
-	rocks_stack:		#rocks_stack is a space to store task's stack
-	gameSelect_PCB:     	#gameSelect_PCB is a space to store task's registers
+	parallel_stack:		#parallel_stack is a space to store task's stack
+	gameSelect_PCB:
 			.space 18
 			.space 200
-	gameSelect_stack:	#gameSelect_stack is a space to store task's stack
-
+	gameSelect_stack:
 .data
 	time_slice: .word 100	#time_slice is a value of each task runtime duration
 
@@ -42,8 +41,9 @@
 main:
 	#Set up $cctrl
 	movsg $1, $cctrl	#Store the value from $cctrl to general register $1
-	andi $1,$1,0x0F		#Save the last bits of KU, OKU, IE, OIE
-	ori $5,$1,0x4D		#Using ori to open the timer interrupt, IRQ2, KU, OKU, IE
+	#andi $1,$1,0x0F		#Save the last bits of KU, OKU, IE, OIE
+	#ori $1,$1,0x4D		#Using ori to open the timer interrupt, IRQ2, KU, OKU, IE
+	addi $5, $0, 0x4D
 	movgs $cctrl, $5	#Restore value into $cctrl
 
 	#Set up $evec
@@ -59,53 +59,63 @@ main:
 	addi $1, $0, 0x03	#Set up auto-start and timer-enable value
 	sw $1, 0x72000($0)	#Store the control value into timer
 
-	#Set up Multitasking, PCB 1, breakout game
-	la $1, breakout_PCB	#Load the base address for breakout PCB, task 1
-	la $2, rocks_PCB	#Load task 2 PCB
+	#Set up Multitasking, PCB 1, serial task
+	la $1, serial_PCB	#Load the base address for serial PCB, task 1
+	la $2, parallel_PCB	#Load task 2 PCB
 	sw $2, pcb_link($1)	#Store address to pcb_link
-	la $2, breakout_stack	#Load stack
+	la $2, serial_stack	#Load stack
 	sw $2, pcb_sp($1)	#Store to pcb_sp
-	la $2, breakout_main	#Load breakout main program address
+	la $2, serial_main	#Load serial main program address
 	sw $2, pcb_ear($1)	#Store to pcb_ear
+	#movsg $2, $cctrl	#Load cctrl settings
 	sw $5, pcb_cctrl($1)	#Store to pcb_cctrl
 
-	#Set up Multitasking, PCB 2, rocks task
-	la $1, rocks_PCB	#Load the base address for rocks PCB, task 2
+	#Set up Multitasking, PCB 2, parallel task
+	la $1, parallel_PCB	#Load the base address for parallel PCB, task 2
 	la $2, gameSelect_PCB	#Load task 1 PCB
 	sw $2, pcb_link($1)	#Store address to pcb_link
-	la $2, rocks_stack	#Load stack
+	la $2, parallel_stack	#Load stack
 	sw $2, pcb_sp($1)	#Store to pcb_sp
-	la $2, rocks_main	#Load rocks main program address
+	la $2, parallel_main	#Load serial main program address
 	sw $2, pcb_ear($1)	#Store to pcb_ear
+	#movsg $2, $cctrl	#Load cctrl settings
 	sw $5, pcb_cctrl($1)	#Store to pcb_cctrl
 
-	#Set up Multitasking, PCB 3, gameSelect task
-	la $1, gameSelect_PCB	#Load the base address for gameSelect PCB, task 2
-	la $2, breakout_PCB	#Load task 1 PCB
+	#Set up gameSelect PCB
+	la $1, gameSelect_PCB
+	la $2, serial_PCB
 	sw $2, pcb_link($1)	#Store address to pcb_link
 	la $2, gameSelect_stack	#Load stack
 	sw $2, pcb_sp($1)	#Store to pcb_sp
-	la $2, gameSelect_main	#Load gameSelect main program address
+	la $2, gameSelect_main	#Load serial main program address
 	sw $2, pcb_ear($1)	#Store to pcb_ear
+	#movsg $2, $cctrl	#Load cctrl settings
 	sw $5, pcb_cctrl($1)	#Store to pcb_cctrl
 
 	#Set the first run task, serial task
-	la $1, breakout_PCB	#Load the address of serial_PCB
-	sw $1, current_task($0)	#Store the address to current task pointer
-	j Load_Context		#Jump to load context of registers from PCB
+	la $1, serial_PCB	#Load the address of serial_PCB
+	sw $1, current_task($0)	#Store the address to current task flag
+	j Load_Context	#Jump to load context of registers from PCB
 	
 Interrupt_Handler:
-	#When interrupts generated, by the set of $evec
-	#It will go here to handle the interrupt
-
-	movsg $13,$estat	#Get the value of $estat into $13
-	andi $4,$13,0xFFB0	#Check if there are other interrupts besides IRQ2, 					#0b10110000=0xB0,last 4 bits are undefinied in $estat
-	beqz $4,IRQ_2_Handler	#If there is only IRQ2, then brench to the handler
-	lw $13,old_vector($0)	#Else load the value in old_vector, the orignal handler
-	jr $13			#Jump to that handler
+	#When interrupts generated, by the set of $evec,
+	#it will go here to handle the interrupt
+	#movsg $13,$estat	#Get the value of $estat into $13
+	#andi $4,$13,0xFFB0	#Check if there are other interrupts besides IRQ2, 					#0b10110000=0xB0,last 4 bits are undefinied in $estat
+	#beqz $4,IRQ_2_Handler	#If there is only IRQ2, then brench to the handler
+	#lw $13,old_vector($0)	#Else load the value in old_vector, the orignal handler
+	#jr $13			#Jump to that handler
+	movsg $13, $estat
+        andi $13, $13, 0x40 
+        bnez $13, IRQ_2_Handler
+        lw $13, old_vector($0)
+        jr $13
 
 IRQ_2_Handler:
 	sw $0, 0x72003($0)	#Acknowledge timer
+	lw $13, counter($0)	#Retrive counter value into $13
+	addi $13,$13,1		#Add one more into $13
+	sw $13, counter($0)	#Restore $13 into counter
 	lw $13, time_slice($0)	#Load time slice value into $13
 	subi $13, $13, 1	#Substract by one
 	sw $13, time_slice($0)	#Restore $13 into time_slice
