@@ -45,4 +45,5 @@ void parallel_main(){
 		}
 	}
 }
+//Yunhao Fu, 1255469, COMP200
 

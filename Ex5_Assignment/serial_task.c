@@ -22,6 +22,7 @@ char read_char(){
 		}
 		return '\0';					//Otherwise, return empty char
 	}
+	return '\0';					//Otherwise, return empty char
 }
 
 void print_char(char charToPass){
@@ -148,4 +149,4 @@ void serial_main(){
 		clean_line();
 	}
 }
-
+//Yunhao Fu, 1255469, COMP200

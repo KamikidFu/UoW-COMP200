@@ -2,20 +2,19 @@
 	old_vector: .word	#old_vector is a place to store system handler address
 	current_task: .word	#current_task is to store the current running task PCB address
 	serial_PCB:  		#serial_PCB is a space to store task's registers
-			.space 20
+			.space 19
 			.space 200
 	serial_stack:		#serial_stack is a space to store task's stack
 	parallel_PCB:   	#parallel_PCB is a space to store task's registers
-			.space 20
+			.space 19
 			.space 200
 	parallel_stack:		#parallel_stack is a space to store task's stack
 	gameSelect_PCB:
-			.space 20
+			.space 19
 			.space 200
 	gameSelect_stack:
-	time_slice: .word
 .data
-	#time_slice: .word 100	#time_slice is a value of each task runtime duration
+	time_slice: .word 100	#time_slice is a value of each task runtime duration
 
 #These are definitions of both general and special registers in PCB
 .equ pcb_link, 0		#pcb_link is a space to store next task's PCB address
@@ -37,7 +36,6 @@
 .equ pcb_ear, 16		#pcb_ear is to store $ear, the exception address register
 .equ pcb_cctrl, 17		#pcb_cctrl is to store $cctrl, the CPU control register
 .equ pcb_timeSlice, 18
-.equ pcb_enable, 19		#pcb_enable is an enabled flag, skip unenabed task
 
 .text
 .global main
@@ -67,13 +65,12 @@ main:
 	sw $2, pcb_link($1)	#Store address to pcb_link
 	la $2, serial_stack	#Load stack
 	sw $2, pcb_sp($1)	#Store to pcb_sp
-	la $2, task1_entry	#Load serial main program address
+	la $2, serial_main	#Load serial main program address
 	sw $2, pcb_ear($1)	#Store to pcb_ear
 	movsg $2, $cctrl	#Load cctrl settings
 	sw $2, pcb_cctrl($1)	#Store to pcb_cctrl
 	addi $2, $0, 1
 	sw $2, pcb_timeSlice($1)
-	sw $2, pcb_enable($1)
 
 	#Set up Multitasking, PCB 2, parallel task
 	la $1, parallel_PCB	#Load the base address for parallel PCB, task 2
@@ -81,13 +78,12 @@ main:
 	sw $2, pcb_link($1)	#Store address to pcb_link
 	la $2, parallel_stack	#Load stack
 	sw $2, pcb_sp($1)	#Store to pcb_sp
-	la $2, task2_entry	#Load serial main program address
+	la $2, parallel_main	#Load serial main program address
 	sw $2, pcb_ear($1)	#Store to pcb_ear
 	movsg $2, $cctrl	#Load cctrl settings
 	sw $2, pcb_cctrl($1)	#Store to pcb_cctrl
 	addi $2, $0, 1
 	sw $2, pcb_timeSlice($1)
-	sw $2, pcb_enable($1)
 
 	#Set up gameSelect PCB
 	la $1, gameSelect_PCB
@@ -95,34 +91,18 @@ main:
 	sw $2, pcb_link($1)	#Store address to pcb_link
 	la $2, gameSelect_stack	#Load stack
 	sw $2, pcb_sp($1)	#Store to pcb_sp
-	la $2, task3_entry	#Load serial main program address
+	la $2, gameSelect_main	#Load serial main program address
 	sw $2, pcb_ear($1)	#Store to pcb_ear
 	movsg $2, $cctrl	#Load cctrl settings
 	sw $2, pcb_cctrl($1)	#Store to pcb_cctrl
 	addi $2, $0, 4
 	sw $2, pcb_timeSlice($1)
-	addi $2, $0, 1
-	sw $2, pcb_enable($1)
 
 	#Set the first run task, serial task
 	la $1, serial_PCB	#Load the address of serial_PCB
 	sw $1, current_task($0)	#Store the address to current task flag
 	j Renew_time_slice	#Jump to load context of registers from PCB
-
-task1_entry:
-	jal serial_main
-	j Quit_Task
-task2_entry:
-	jal parallel_main
-	j Quit_Task
-task3_entry:
-	jal gameSelect_main
-	j Quit_Task
-
-Quit_Task:
-	lw $13, current_task($0)
-	sw $0, pcb_enable($13)
-
+	
 Interrupt_Handler:
 	#When interrupts generated, by the set of $evec,
 	#it will go here to handle the interrupt
@@ -132,7 +112,7 @@ Interrupt_Handler:
 	#lw $13,old_vector($0)	#Else load the value in old_vector, the orignal handler
 	#jr $13			#Jump to that handler
 	movsg $13, $estat
-        andi $13, $13, 0x40
+        andi $13, $13, 0x40 
         bnez $13, IRQ_2_Handler
         lw $13, old_vector($0)
         jr $13
@@ -183,10 +163,6 @@ Schedule:
 	lw $13, current_task($0)#Load current task PCB address
 	lw $13, pcb_link($13)	#Using $13 value loaded before, to load next task PCB address in pcb_link
 	sw $13, current_task($0)#Store next task PCB address into current_task flag
-	lw $13, current_task($0)
-	lw $13, pcb_enable($13)
-	seqi $13, $13, 0
-	bnez $13, Schedule
 
 Renew_time_slice:
 	#Renew time slice for scheduled next task to run
@@ -223,3 +199,4 @@ Load_Context:
 	lw $ra, pcb_ra($13)
 
 	rfe
+#Yunhao Fu, 1255469, COMP200
